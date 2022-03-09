@@ -16,6 +16,10 @@ import matplotlib.pyplot as plt
 
 from time import time, sleep
 
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_pose = mp.solutions.pose
+
 from utils import CvFpsCalc
 from utils import KeypointsToAngles
 from utils import SocketSend
@@ -30,8 +34,8 @@ def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--device", type=int, default=0)
-    parser.add_argument("--width", help='cap width', type=int, default=960)
-    parser.add_argument("--height", help='cap height', type=int, default=540)
+    parser.add_argument("--width", help='cap width', type=int, default=1280)
+    parser.add_argument("--height", help='cap height', type=int, default=720)
 
     parser.add_argument("--video", type=str, default="")
     parser.add_argument("--fps", type=int, default=10)
@@ -99,7 +103,7 @@ def main():
     if enable_teleop:
         # Initialize socket to send keypoints
         ss = SocketSend()
-        sr = SocketReceiveSignal()
+        # sr = SocketReceiveSignal()
 
     cvFpsCalc = CvFpsCalc(buffer_len=10)
 
@@ -116,17 +120,29 @@ def main():
         ret, image = cap.read()
         if not ret:
             break
-        image = cv.flip(image, 1)
+        # image = cv.flip(image, 1)
         debug_image = copy.deepcopy(image)
-
+        
+        # To improve performance, optionally mark the image as not writeable to
+        # pass by reference.
+        image.flags.writeable = False
         image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
         results = pose.process(image)
 
         if results.pose_landmarks is not None:
-            brect = calc_bounding_rect(debug_image, results.pose_landmarks)
+            image.flags.writeable = True
+            # image = cv.cvtColor(image, cv.COLOR_RGB2BGR)
+            # mp_drawing.draw_landmarks(
+            #     image,
+            #     results.pose_landmarks,
+            #     mp_pose.POSE_CONNECTIONS,
+            #     landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
+            #  # Flip the image horizontally for a selfie-view display.
+            # cv.imshow('MediaPipe Pose', cv.flip(image, 1))
+            # brect = calc_bounding_rect(debug_image, results.pose_landmarks)
             debug_image = draw_landmarks(debug_image, results.pose_landmarks)
-            debug_image = draw_bounding_rect(use_brect, debug_image, brect)
-
+            # debug_image = draw_bounding_rect(use_brect, debug_image, brect)
+        
         if plot_world_landmark:
             if results.pose_world_landmarks is not None:
                 plot_world_landmarks(plt, ax, results.pose_world_landmarks)
@@ -151,8 +167,8 @@ def main():
 
         cv.imshow('Pepper Teleop', debug_image)
 
-        if (len(video)>0):
-            sleep(max(1./fps - (time() - start), 0))
+        # if (len(video)>0):
+        sleep(max(1./fps - (time() - start), 0))
 
     if plot_angle_trace:
         angle_labels = ["LShoulderPitch","LShoulderRoll", "LElbowYaw", "LElbowRoll", "RShoulderPitch","RShoulderRoll", "RElbowYaw", "RElbowRoll", "HipPitch"]
@@ -224,8 +240,9 @@ def do_teleop(landmarks):
     HipPitch = keypointsToAngles.obtain_HipPitch_angles(pMidHip, pNeck) # This is switched, why?
 
     angles = [LShoulderPitch,LShoulderRoll, LElbowYaw, LElbowRoll, RShoulderPitch,RShoulderRoll, RElbowYaw, RElbowRoll, HipPitch]
+    
 
-    print(angles)
+    # print(LShoulderPitch*180/np.pi, LShoulderRoll*180/np.pi)
     angle_trace.append(angles)
 
     if (checkLim(LShoulderPitch, limitsLShoulderPitch) or 
